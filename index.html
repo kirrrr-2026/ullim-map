@@ -1,9 +1,12 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+          content="width=device-width, initial-scale=1.0,
+                   maximum-scale=1.0, user-scalable=no">
+
     <title>울림 - 울산 지도</title>
 
     <style>
@@ -12,6 +15,8 @@
             padding: 0;
             width: 100%;
             height: 100%;
+            overflow: hidden;
+            font-family: sans-serif;
         }
 
         #map {
@@ -21,59 +26,232 @@
 
         #error {
             display: none;
-            padding: 20px;
-            color: #c62828;
-            font-size: 14px;
+            position: absolute;
+            top: 20px;
+            left: 12px;
+            right: 12px;
+            padding: 14px;
+            background: #FFFFFF;
+            color: #C62828;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 100;
         }
     </style>
 </head>
-<body>
 
+<body>
 <div id="map"></div>
 <div id="error"></div>
 
-<!-- YOUR_JAVASCRIPT_KEY를 실제 JavaScript 키로 변경 -->
-<!--ec55b74951bce5dd0a395776d88868d8-->
 <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=ec55b74951bce5dd0a395776d88868d8&autoload=false"></script>
 
 <script>
+    let map = null;
+    let placeMarkers = [];
+    let myLocationMarker = null;
+    let myLocationCircle = null;
+
+    const regionCenters = {
+        "전체": [35.5384, 129.3114, 8],
+        "남구": [35.5270, 129.3200, 7],
+        "중구": [35.5680, 129.3330, 7],
+        "동구": [35.5050, 129.4250, 7],
+        "북구": [35.5850, 129.3600, 8],
+        "울주군": [35.5400, 129.2000, 9]
+    };
+
     function showError(message) {
-        document.getElementById("map").style.display = "none";
         const error = document.getElementById("error");
-        error.style.display = "block";
         error.textContent = message;
+        error.style.display = "block";
+
+        if (window.UllimAndroid) {
+            window.UllimAndroid.onMapError(message);
+        }
     }
 
-    if (typeof kakao === "undefined" || !kakao.maps) {
-        showError("카카오맵 SDK를 불러오지 못했습니다. JavaScript 키와 도메인 설정을 확인하세요.");
-    } else {
-        kakao.maps.load(function () {
-            const container = document.getElementById("map");
+    function notifyReady() {
+        if (window.UllimAndroid) {
+            window.UllimAndroid.onMapReady();
+        }
+    }
 
-            const options = {
-                center: new kakao.maps.LatLng(
-                    35.5384,
-                    129.3114
-                ),
-                level: 7
-            };
+    window.ullimMoveTo = function(latitude, longitude, level) {
+        if (!map) return;
 
-            const map = new kakao.maps.Map(
-                container,
-                options
+        const point = new kakao.maps.LatLng(
+            latitude, longitude
+        );
+
+        map.setLevel(level);
+        map.panTo(point);
+    };
+
+    window.ullimShowPlaces = function(places, region) {
+        if (!map) return;
+
+        // 이전 마커 삭제
+        placeMarkers.forEach(function(marker) {
+            marker.setMap(null);
+        });
+
+        placeMarkers = [];
+
+        // 새 장소 마커 생성
+        places.forEach(function(place) {
+            const position = new kakao.maps.LatLng(
+                place.latitude,
+                place.longitude
             );
 
             const marker = new kakao.maps.Marker({
-                position: new kakao.maps.LatLng(
-                    35.5384,
-                    129.3114
-                )
+                position: position,
+                title: place.name,
+                map: map
             });
 
-            marker.setMap(map);
+            kakao.maps.event.addListener(
+                marker, "click", function() {
+                    map.setLevel(4);
+                    map.panTo(position);
+
+                    if (window.UllimAndroid) {
+                        window.UllimAndroid.onPlaceSelected(
+                            place.index
+                        );
+                    }
+                }
+            );
+
+            placeMarkers.push(marker);
+        });
+
+        if (places.length === 1) {
+            window.ullimMoveTo(
+                places[0].latitude,
+                places[0].longitude,
+                4
+            );
+        } else {
+            const center = regionCenters[region]
+                    || regionCenters["전체"];
+
+            window.ullimMoveTo(
+                center[0], center[1], center[2]
+            );
+        }
+    };
+
+    window.ullimShowMyLocation = function(latitude, longitude) {
+        if (!map) return;
+
+        const position = new kakao.maps.LatLng(
+            latitude, longitude
+        );
+
+        if (myLocationMarker) {
+            myLocationMarker.setMap(null);
+        }
+
+        if (myLocationCircle) {
+            myLocationCircle.setMap(null);
+        }
+
+        myLocationMarker = new kakao.maps.Marker({
+            position: position,
+            title: "내 위치",
+            map: map
+        });
+
+        myLocationCircle = new kakao.maps.Circle({
+            center: position,
+            radius: 30,
+            strokeWeight: 2,
+            strokeColor: "#185744",
+            strokeOpacity: 0.8,
+            fillColor: "#4DAA89",
+            fillOpacity: 0.2,
+            map: map
+        });
+
+        window.ullimMoveTo(latitude, longitude, 3);
+    };
+
+    if (typeof kakao === "undefined" || !kakao.maps) {
+        showError(
+            "카카오맵 SDK를 불러오지 못했습니다. "
+            + "JavaScript 키와 도메인을 확인하세요."
+        );
+    } else {
+        kakao.maps.load(function() {
+            try {
+                map = new kakao.maps.Map(
+                    document.getElementById("map"),
+                    {
+                        center: new kakao.maps.LatLng(
+                            35.5384, 129.3114
+                        ),
+                        level: 8
+                    }
+                );
+
+                // 웹브라우저에서 직접 열었을 때도
+                // 기본 장소 7곳 표시
+                if (!window.UllimAndroid) {
+                    window.ullimShowPlaces([
+                        {
+                            index: 0,
+                            name: "울산대공원",
+                            latitude: 35.5270,
+                            longitude: 129.2890
+                        },
+                        {
+                            index: 1,
+                            name: "태화강 국가정원",
+                            latitude: 35.5500,
+                            longitude: 129.2960
+                        },
+                        {
+                            index: 2,
+                            name: "장생포 고래문화마을",
+                            latitude: 35.5020,
+                            longitude: 129.3800
+                        },
+                        {
+                            index: 3,
+                            name: "대왕암공원",
+                            latitude: 35.4910,
+                            longitude: 129.4390
+                        },
+                        {
+                            index: 4,
+                            name: "강동 몽돌해변",
+                            latitude: 35.6290,
+                            longitude: 129.4400
+                        },
+                        {
+                            index: 5,
+                            name: "간절곶",
+                            latitude: 35.3590,
+                            longitude: 129.3600
+                        },
+                        {
+                            index: 6,
+                            name: "반구대 암각화",
+                            latitude: 35.5990,
+                            longitude: 129.1690
+                        }
+                    ], "전체");
+                }
+
+                notifyReady();
+
+            } catch (e) {
+                showError("지도 초기화 오류: " + e.message);
+            }
         });
     }
 </script>
-
 </body>
 </html>
