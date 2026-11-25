@@ -143,7 +143,7 @@
         }
     };
 
-    window.ullimSearchPlace = function(keyword) {
+    window.ullimSearchPlace = function(keyword, exactName) {
 
     if (!map) return;
 
@@ -152,6 +152,23 @@
     placesService.keywordSearch(keyword, function(data, status) {
 
         if (status === kakao.maps.services.Status.OK) {
+            // 게시글에서 지도 보기로 이동한 경우
+            if (exactName) {
+            
+                const normalize = function(name) {
+                    return name.replace(/\s+/g, "").toLowerCase();
+                };
+            
+                const exactMatches = data.filter(function(place) {
+                    return normalize(place.place_name)
+                        === normalize(exactName);
+                });
+            
+                // 정확히 일치하는 장소가 하나일 경우
+                if (exactMatches.length === 1) {
+                    data = exactMatches;
+                }
+            }
 
             // 기존 장소 마커 제거
             placeMarkers.forEach(function(marker) {
