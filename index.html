@@ -85,7 +85,7 @@
         );
 
         map.setLevel(level);
-        map.panTo(point);
+        map.setCenter(point);
     };
 
     window.ullimShowPlaces = function(places, region) {
@@ -114,7 +114,7 @@
             kakao.maps.event.addListener(
                 marker, "click", function() {
                     map.setLevel(4);
-                    map.panTo(position);
+                    map.setCenter(position);
 
                     if (window.UllimAndroid) {
                         window.UllimAndroid.onPlaceSelected(
