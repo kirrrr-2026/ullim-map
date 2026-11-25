@@ -44,7 +44,7 @@
 <div id="map"></div>
 <div id="error"></div>
 
-<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=ec55b74951bce5dd0a395776d88868d8&autoload=false"></script>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=ec55b74951bce5dd0a395776d88868d8&autoload=false&libraries=services"></script>
 
 <script>
     let map = null;
@@ -143,6 +143,96 @@
         }
     };
 
+    window.ullimSearchPlace = function(keyword) {
+
+    if (!map) return;
+
+    const placesService = new kakao.maps.services.Places();
+
+    placesService.keywordSearch(keyword, function(data, status) {
+
+        if (status === kakao.maps.services.Status.OK) {
+
+            // 기존 장소 마커 제거
+            placeMarkers.forEach(function(marker) {
+                marker.setMap(null);
+            });
+
+            placeMarkers = [];
+
+            const bounds = new kakao.maps.LatLngBounds();
+
+            data.forEach(function(place) {
+
+                const position = new kakao.maps.LatLng(
+                    Number(place.y),
+                    Number(place.x)
+                );
+
+                const marker = new kakao.maps.Marker({
+                    position: position,
+                    title: place.place_name,
+                    map: map
+                });
+
+                placeMarkers.push(marker);
+                bounds.extend(position);
+
+                kakao.maps.event.addListener(
+                    marker, "click", function() {
+
+                        map.setLevel(4);
+                        map.setCenter(position);
+
+                        if (window.UllimAndroid) {
+                            window.UllimAndroid.onSearchResult(
+                                place.place_name,
+                                place.road_address_name
+                                    || place.address_name
+                            );
+                        }
+                    }
+                );
+            });
+
+            if (data.length === 1) {
+                map.setLevel(4);
+                map.setCenter(
+                    new kakao.maps.LatLng(
+                        Number(data[0].y),
+                        Number(data[0].x)
+                    )
+                );
+            } else {
+                map.setBounds(bounds);
+            }
+
+            // 검색 결과가 하나일 경우 상세 정보 표시
+            if (data.length === 1 && window.UllimAndroid) {
+                window.UllimAndroid.onSearchResult(
+                    data[0].place_name,
+                    data[0].road_address_name
+                        || data[0].address_name
+                );
+            }
+
+            // 여러 장소가 검색된 경우 선택 안내
+            if (data.length > 1 && window.UllimAndroid) {
+                window.UllimAndroid.onSearchResult(
+                    "검색 결과 " + data.length + "개",
+                    "지도에서 원하는 장소를 선택해 주세요."
+                );
+            }
+
+        } else {
+
+            if (window.UllimAndroid) {
+                window.UllimAndroid.onSearchEmpty();
+            }
+        }
+    });
+};
+    
     window.ullimShowMyLocation = function(latitude, longitude) {
         if (!map) return;
 
