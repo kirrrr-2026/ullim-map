@@ -249,6 +249,108 @@
         }
     });
 };
+
+// 핫플레이스 게시글 작성용 장소 검색
+window.ullimSearchSelectablePlaces = function(keyword, requestId) {
+
+    if (!window.UllimAndroid ||
+        typeof window.UllimAndroid.onPlaceSearchResults !== "function") {
+        return;
+    }
+
+    const sendResults = function(results, message) {
+        window.UllimAndroid.onPlaceSearchResults(
+            requestId,
+            JSON.stringify(results),
+            message
+        );
+    };
+
+    if (!map) {
+        sendResults([], "지도 서비스가 준비되지 않았습니다.");
+        return;
+    }
+
+    const placesService = new kakao.maps.services.Places();
+
+    const allowedRegions = [
+        "남구", "중구", "동구", "북구", "울주군"
+    ];
+
+    // 주소에서 울산 지역 자동 추출
+    function extractRegion(address) {
+
+        const parts = (address || "").trim().split(/\s+/);
+
+        if (parts[0] !== "울산" &&
+            parts[0] !== "울산광역시") {
+            return "";
+        }
+
+        return allowedRegions.includes(parts[1])
+            ? parts[1]
+            : "";
+    }
+
+    placesService.keywordSearch(
+        "울산 " + keyword,
+        function(data, status) {
+
+            if (status === kakao.maps.services.Status.ZERO_RESULT) {
+                sendResults([], "검색 결과가 없습니다.");
+                return;
+            }
+
+            if (status !== kakao.maps.services.Status.OK) {
+                sendResults([], "장소 검색에 실패했습니다.");
+                return;
+            }
+
+            const results = [];
+
+            data.forEach(function(place) {
+
+                const address = place.address_name || "";
+                const roadAddress = place.road_address_name || "";
+
+                const region =
+                    extractRegion(address) ||
+                    extractRegion(roadAddress);
+
+                // 울산 외 지역 제외
+                if (!region) return;
+
+                const latitude = Number(place.y);
+                const longitude = Number(place.x);
+
+                if (!Number.isFinite(latitude) ||
+                    !Number.isFinite(longitude) ||
+                    !place.id ||
+                    !place.place_name) {
+                    return;
+                }
+
+                results.push({
+                    kakaoPlaceId: String(place.id),
+                    placeName: place.place_name,
+                    address: address,
+                    roadAddress: roadAddress,
+                    region: region,
+                    latitude: latitude,
+                    longitude: longitude
+                });
+            });
+
+            sendResults(
+                results,
+                results.length === 0
+                    ? "울산 지역의 검색 결과가 없습니다."
+                    : ""
+            );
+        },
+        { size: 15 }
+    );
+};
     
     window.ullimShowMyLocation = function(latitude, longitude) {
         if (!map) return;
