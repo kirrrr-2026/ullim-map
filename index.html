@@ -76,6 +76,20 @@
         }
     }
 
+    // Android에서 전달받은 확대·축소 명령 처리
+    window.ullimZoomMap = function(direction) {
+    
+        if (!map) return;
+    
+        const currentLevel = map.getLevel();
+    
+        const nextLevel = currentLevel + direction;
+    
+        map.setLevel(
+            Math.max(1, Math.min(14, nextLevel))
+        );
+    };
+    
     window.ullimMoveTo = function(latitude, longitude, level) {
         if (!map) return;
 
