@@ -50,6 +50,8 @@
     let placeMarkers = [];
     let myLocationMarker = null;
     let myLocationCircle = null;
+    // 이전 검색 요청 무효화 관리
+    let searchRequestVersion = 0;
 
     const regionCenters = {
         "전체": [35.5384, 129.3114, 8],
@@ -119,6 +121,9 @@
     
     window.ullimShowPlaces = function(places, region) {
         if (!map) return;
+
+        // 이전 일반 검색 응답 무효화
+        searchRequestVersion++;
 
         // 이전 마커 삭제
         placeMarkers.forEach(function(marker) {
@@ -245,65 +250,134 @@
         }
     };
 
-    window.ullimSearchPlace = function(keyword, exactName) {
+    // 일반 장소 검색
+window.ullimSearchPlace = function(keyword, exactName) {
 
     if (!map) return;
 
-    const placesService = new kakao.maps.services.Places();
+    // 현재 검색 요청 번호
+    const requestVersion = ++searchRequestVersion;
 
-    placesService.keywordSearch(keyword, function(data, status) {
+    // 기존 장소 마커 제거
+    placeMarkers.forEach(function(marker) {
+        marker.setMap(null);
+    });
 
-        if (status === kakao.maps.services.Status.OK) {
-            // 게시글에서 지도 보기로 이동한 경우
+    placeMarkers = [];
+
+    const placesService =
+        new kakao.maps.services.Places();
+
+    // 장소명 비교용 정규화
+    function normalize(name) {
+        return (name || "")
+            .replace(/\s+/g, "")
+            .toLowerCase();
+    }
+
+    // 울산 지역 여부 확인
+    function isUlsan(address) {
+
+        const parts = (address || "")
+            .trim()
+            .split(/\s+/);
+
+        return parts[0] === "울산"
+            || parts[0] === "울산광역시";
+    }
+
+    function showEmpty() {
+
+        if (window.UllimAndroid) {
+            window.UllimAndroid.onSearchEmpty();
+        }
+    }
+
+    placesService.keywordSearch(
+        keyword,
+        function(data, status) {
+
+            // 이전 검색의 지연된 응답 무시
+            if (requestVersion !== searchRequestVersion) {
+                return;
+            }
+
+            if (status !== kakao.maps.services.Status.OK) {
+                showEmpty();
+                return;
+            }
+
+            // 울산 외 지역 및 잘못된 좌표 제외
+            data = data.filter(function(place) {
+
+                return (
+                    isUlsan(place.address_name)
+                    || isUlsan(place.road_address_name)
+                )
+                && Number.isFinite(Number(place.y))
+                && Number.isFinite(Number(place.x));
+            });
+
+            // 장소명이 정확히 일치하는 결과 우선
             if (exactName) {
-            
-                const normalize = function(name) {
-                    return name.replace(/\s+/g, "").toLowerCase();
-                };
-            
-                const exactMatches = data.filter(function(place) {
-                    return normalize(place.place_name)
-                        === normalize(exactName);
-                });
-            
-                // 정확히 일치하는 장소가 하나일 경우
-                if (exactMatches.length === 1) {
+
+                const exactMatches = data.filter(
+                    function(place) {
+
+                        return normalize(place.place_name)
+                            === normalize(exactName);
+                    }
+                );
+
+                // 정확히 일치하는 장소가 있다면
+                // 해당 장소들만 표시
+                if (exactMatches.length > 0) {
                     data = exactMatches;
                 }
             }
 
-            // 기존 장소 마커 제거
-            placeMarkers.forEach(function(marker) {
-                marker.setMap(null);
-            });
+            if (data.length === 0) {
+                showEmpty();
+                return;
+            }
 
-            placeMarkers = [];
-
-            const bounds = new kakao.maps.LatLngBounds();
+            const bounds =
+                new kakao.maps.LatLngBounds();
 
             data.forEach(function(place) {
 
-                const position = new kakao.maps.LatLng(
-                    Number(place.y),
-                    Number(place.x)
-                );
+                const position =
+                    new kakao.maps.LatLng(
+                        Number(place.y),
+                        Number(place.x)
+                    );
 
-                const marker = new kakao.maps.Marker({
-                    position: position,
-                    title: place.place_name,
-                    map: map
-                });
+                // 일반 검색은 기존 기본 마커 사용
+                const marker =
+                    new kakao.maps.Marker({
+                        position: position,
+                        title: place.place_name,
+                        map: map
+                    });
 
                 placeMarkers.push(marker);
                 bounds.extend(position);
 
                 kakao.maps.event.addListener(
-                    marker, "click", function() {
+                    marker,
+                    "click",
+                    function() {
+
+                        if (requestVersion
+                                !== searchRequestVersion) {
+                            return;
+                        }
 
                         map.setLevel(4);
                         map.setCenter(position);
 
                         if (window.UllimAndroid) {
+
                             window.UllimAndroid.onSearchResult(
                                 place.place_name,
                                 place.road_address_name
@@ -314,44 +388,45 @@
                 );
             });
 
+            // 검색 결과가 하나인 경우
             if (data.length === 1) {
+
                 map.setLevel(4);
+
                 map.setCenter(
                     new kakao.maps.LatLng(
                         Number(data[0].y),
                         Number(data[0].x)
                     )
                 );
+
+                if (window.UllimAndroid) {
+
+                    window.UllimAndroid.onSearchResult(
+                        data[0].place_name,
+                        data[0].road_address_name
+                            || data[0].address_name
+                    );
+                }
+
             } else {
+
+                // 여러 장소가 있는 경우
                 map.setBounds(bounds);
-            }
 
-            // 검색 결과가 하나일 경우 상세 정보 표시
-            if (data.length === 1 && window.UllimAndroid) {
-                window.UllimAndroid.onSearchResult(
-                    data[0].place_name,
-                    data[0].road_address_name
-                        || data[0].address_name
-                );
-            }
+                if (window.UllimAndroid) {
 
-            // 여러 장소가 검색된 경우 선택 안내
-            if (data.length > 1 && window.UllimAndroid) {
-                window.UllimAndroid.onSearchResult(
-                    "검색 결과 " + data.length + "개",
-                    "지도에서 원하는 장소를 선택해 주세요."
-                );
+                    window.UllimAndroid.onSearchResult(
+                        "검색 결과 " + data.length + "개",
+                        "지도에서 원하는 장소를 선택해 주세요."
+                    );
+                }
             }
-
-        } else {
-
-            if (window.UllimAndroid) {
-                window.UllimAndroid.onSearchEmpty();
-            }
-        }
-    });
+        },
+        { size: 15 }
+    );
 };
-
+    
 // 핫플레이스 게시글 작성용 장소 검색
 window.ullimSearchSelectablePlaces = function(keyword, requestId) {
 
@@ -618,6 +693,8 @@ window.ullimResolvePlace = function(keyword, placeId, requestId) {
     
     window.ullimShowMyLocation = function(latitude, longitude) {
         if (!map) return;
+
+        searchRequestVersion++;
 
         const position = new kakao.maps.LatLng(
             latitude, longitude
