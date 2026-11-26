@@ -75,20 +75,6 @@
             window.UllimAndroid.onMapReady();
         }
     }
-
-    // Android에서 전달받은 확대·축소 명령 처리
-    window.ullimZoomMap = function(direction) {
-    
-        if (!map) return;
-    
-        const currentLevel = map.getLevel();
-    
-        const nextLevel = currentLevel + direction;
-    
-        map.setLevel(
-            Math.max(1, Math.min(14, nextLevel))
-        );
-    };
     
     window.ullimMoveTo = function(latitude, longitude, level) {
         if (!map) return;
@@ -682,35 +668,9 @@ window.ullimResolvePlace = function(keyword, placeId, requestId) {
                         level: 8
                     }
                 );
-                // 지도 드래그 허용
+
                 map.setDraggable(true);
-                
-                // 기본 확대·축소 비활성화
-                map.setZoomable(false);
-                
-                // Ctrl + 마우스 휠 확대·축소
-                document.getElementById("map").addEventListener(
-                    "wheel",
-                    function(event) {
-                
-                        event.preventDefault();
-                
-                        if (!event.ctrlKey || event.deltaY === 0) {
-                            return;
-                        }
-                
-                        const currentLevel = map.getLevel();
-                
-                        const nextLevel = event.deltaY < 0
-                            ? currentLevel - 1
-                            : currentLevel + 1;
-                
-                        map.setLevel(
-                            Math.max(1, Math.min(14, nextLevel))
-                        );
-                    },
-                    { passive: false }
-                );
+                map.setZoomable(true);
 
                 // 웹브라우저에서 직접 열었을 때도
                 // 기본 장소 7곳 표시
