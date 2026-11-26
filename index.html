@@ -353,7 +353,11 @@ window.ullimSearchSelectablePlaces = function(keyword, requestId) {
                     roadAddress: roadAddress,
                     region: region,
                     latitude: latitude,
-                    longitude: longitude
+                    longitude: longitude,
+                
+                    // 카카오 장소 카테고리 정보
+                    categoryGroupCode: place.category_group_code || "",
+                    categoryName: place.category_name || ""
                 });
             });
 
@@ -476,21 +480,18 @@ window.ullimResolvePlace = function(keyword, placeId, requestId) {
 
             // 조회 결과를 Android로 전달
             sendResult({
-
                 kakaoPlaceId: String(matchedPlace.id),
-
                 placeName: matchedPlace.place_name,
-
                 address: address,
-
                 roadAddress: roadAddress,
-
                 region: region,
-
                 latitude: latitude,
-
-                longitude: longitude
-
+                longitude: longitude,
+            
+                // 카카오 장소 카테고리 정보
+                categoryGroupCode: matchedPlace.category_group_code || "",
+                categoryName: matchedPlace.category_name || ""
+            
             }, "");
 
             return;
