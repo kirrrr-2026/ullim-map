@@ -668,11 +668,35 @@ window.ullimResolvePlace = function(keyword, placeId, requestId) {
                         level: 8
                     }
                 );
-                // 마우스 드래그를 통한 지도 이동 허용
+                // 지도 드래그 허용
                 map.setDraggable(true);
                 
-                // 마우스 휠을 통한 확대 및 축소 허용
-                map.setZoomable(true);
+                // 기본 확대·축소 비활성화
+                map.setZoomable(false);
+                
+                // Ctrl + 마우스 휠 확대·축소
+                document.getElementById("map").addEventListener(
+                    "wheel",
+                    function(event) {
+                
+                        event.preventDefault();
+                
+                        if (!event.ctrlKey || event.deltaY === 0) {
+                            return;
+                        }
+                
+                        const currentLevel = map.getLevel();
+                
+                        const nextLevel = event.deltaY < 0
+                            ? currentLevel - 1
+                            : currentLevel + 1;
+                
+                        map.setLevel(
+                            Math.max(1, Math.min(14, nextLevel))
+                        );
+                    },
+                    { passive: false }
+                );
 
                 // 웹브라우저에서 직접 열었을 때도
                 // 기본 장소 7곳 표시
