@@ -87,6 +87,36 @@
         map.setCenter(point);
     };
 
+    
+    // 공유 사용자 수에 따른 마커 색상
+    function getSharedMarkerColor(count) {
+    
+        if (count >= 10) {
+            return "#185744";
+        }
+    
+        if (count >= 5) {
+            return "#31865D";
+        }
+    
+        if (count >= 2) {
+            return "#65AE85";
+        }
+    
+        return "#A8D5BA";
+    }
+    
+    // 공유 사용자 수에 따른 숫자 색상
+    function getSharedMarkerTextColor(count) {
+    
+        if (count < 5) {
+            return "#123D2F";
+        }
+    
+        return "#FFFFFF";
+    }
+
+    
     window.ullimShowPlaces = function(places, region) {
         if (!map) return;
 
@@ -109,14 +139,70 @@
                 title: place.name,
                 map: map
             };
+            
             if (place.cloud === true) {
-                const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42"><path d="M16 41 C12 32 1 23 1 16 A15 15 0 0 1 31 16 C31 23 20 32 16 41Z" fill="#185744" stroke="white" stroke-width="1.5"/><circle cx="16" cy="16" r="5" fill="white"/></svg>';
+            
+                // 고유 공유 사용자 수
+                const rawCount = Number(place.uniqueUserCount);
+            
+                const count = Number.isFinite(rawCount)
+                    ? Math.max(0, Math.floor(rawCount))
+                    : 0;
+            
+                // 사용자 수에 따른 색상
+                const markerColor = getSharedMarkerColor(count);
+                const textColor = getSharedMarkerTextColor(count);
+            
+                // 숫자가 너무 길어지는 경우 처리
+                const countLabel = count > 99
+                    ? "99+"
+                    : String(count);
+            
+                const fontSize = countLabel.length >= 3
+                    ? 10
+                    : 15;
+            
+                // 사용자 등록 장소 마커 SVG
+                const svg = `
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         width="36"
+                         height="46"
+                         viewBox="0 0 36 46">
+            
+                        <path
+                            d="M18 45
+                               C13 35 1 25 1 18
+                               A17 17 0 0 1 35 18
+                               C35 25 23 35 18 45Z"
+                            fill="${markerColor}"
+                            stroke="#FFFFFF"
+                            stroke-width="1.5"/>
+            
+                        <text
+                            x="18"
+                            y="18"
+                            text-anchor="middle"
+                            dominant-baseline="central"
+                            font-family="Arial, sans-serif"
+                            font-size="${fontSize}"
+                            font-weight="bold"
+                            fill="${textColor}">${countLabel}</text>
+            
+                    </svg>
+                `;
+            
                 options.image = new kakao.maps.MarkerImage(
-                    'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-                    new kakao.maps.Size(32, 42),
-                    {offset: new kakao.maps.Point(16, 41)}
+                    "data:image/svg+xml;charset=UTF-8,"
+                        + encodeURIComponent(svg),
+            
+                    new kakao.maps.Size(36, 46),
+            
+                    {
+                        offset: new kakao.maps.Point(18, 45)
+                    }
                 );
             }
+
             const marker = new kakao.maps.Marker(options);
 
             kakao.maps.event.addListener(
@@ -582,6 +668,11 @@ window.ullimResolvePlace = function(keyword, placeId, requestId) {
                         level: 8
                     }
                 );
+                // 마우스 드래그를 통한 지도 이동 허용
+                map.setDraggable(true);
+                
+                // 마우스 휠을 통한 확대 및 축소 허용
+                map.setZoomable(true);
 
                 // 웹브라우저에서 직접 열었을 때도
                 // 기본 장소 7곳 표시
